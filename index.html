@@ -78,7 +78,40 @@ body {
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
-
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  // Cole aqui a configuração do Firebase (Configurações do projeto → Seus apps → Web)
+  var cfg = { apiKey: "", authDomain: "", projectId: "", appId: "" };
+  var NL = window.NL = { ready: false, user: null, tick: 0, cloud: null };
+  if (!cfg.apiKey || typeof firebase === "undefined") return;
+  firebase.initializeApp(cfg);
+  var auth = firebase.auth(), db = firebase.firestore();
+  NL.ready = true;
+  auth.onAuthStateChanged(function (u) {
+    NL.user = u ? { uid: u.uid, name: u.displayName || "", email: u.email || "" } : null;
+    NL.tick++;
+  });
+  NL.login = function () {
+    var p = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(p).catch(function (e) { if (e && e.code === "auth/popup-blocked") auth.signInWithRedirect(p); });
+  };
+  NL.logout = function () { auth.signOut(); };
+  NL.save = function (slot, json) {
+    if (!NL.user) return;
+    db.collection("users").doc(NL.user.uid).collection("saves").doc("slot" + slot).set({ data: json, t: Date.now() });
+  };
+  NL.loadAll = function () {
+    NL.cloud = null;
+    if (!NL.user) return;
+    db.collection("users").doc(NL.user.uid).collection("saves").get().then(function (s) {
+      var o = {}; s.forEach(function (d) { o[d.id] = d.data().data; }); NL.cloud = JSON.stringify(o);
+    }).catch(function () { NL.cloud = "{}"; });
+  };
+})();
+</script>
 	</head>
 	<body>
 		<canvas id="canvas">
@@ -97,7 +130,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":3054944,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":5354416,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
