@@ -81,18 +81,23 @@ body {
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 <script>
 (function () {
   // Cole aqui a configuração do Firebase (Configurações do projeto → Seus apps → Web)
   var cfg = { apiKey: "AIzaSyBJyn9J3Nv5dU7h5Uv-l_Ummowv1ik_G7E", authDomain: "night-legends-4a762.firebaseapp.com", projectId: "night-legends-4a762", appId: "1:218207544089:web:85a9b146a9aa5ef2b69b88" };
-  // Mude para true depois de publicar o servidor do Pix (COMO-ATIVAR-PIX.md)
-  var PIX_ATIVO = false;
+  // Endereço do servidor do Pix na Cloudflare (vazio = Pix desligado)
+  var SERVIDOR = "https://night-legends-pix.eduardosolifritz.workers.dev";
   var NL = window.NL = { ready: false, user: null, tick: 0, cloud: null, gems: 0, msg: "" };
   if (!cfg.apiKey || typeof firebase === "undefined") return;
   firebase.initializeApp(cfg);
   var auth = firebase.auth(), db = firebase.firestore();
-  var fn = firebase.app().functions("southamerica-east1");
+  function chamar(rota, dados) {
+    return auth.currentUser.getIdToken().then(function (tk) {
+      return fetch(SERVIDOR + rota, { method: "POST", headers: { "Authorization": "Bearer " + tk, "Content-Type": "application/json" }, body: JSON.stringify(dados) });
+    }).then(function (r) {
+      return r.json().then(function (j) { if (!r.ok) throw new Error(j.erro || "erro"); return j; });
+    });
+  }
   var parar = null;
   NL.ready = true;
   auth.onAuthStateChanged(function (u) {
@@ -125,7 +130,7 @@ body {
   };
   NL.gastar = function (n) {
     if (!NL.user) return;
-    fn.httpsCallable("gastarJoias")({ quantidade: n }).catch(function () {});
+    if (SERVIDOR) chamar("/gastar", { quantidade: n }).catch(function () {});
   };
 
   // ---------- Pix ----------
@@ -147,7 +152,7 @@ body {
     b.onclick = f;
     return b;
   }
-  if (PIX_ATIVO) NL.pix = function (pacote) {
+  if (SERVIDOR) NL.pix = function (pacote) {
     var j = janela();
     if (!NL.user) {
       j.caixa.appendChild(el("p", "font-size:17px", "Entre com Google (no menu do jogo) para comprar joias. Assim elas ficam guardadas na sua conta."));
@@ -157,8 +162,7 @@ body {
     var aviso = el("p", "font-size:17px", "Gerando o Pix...");
     j.caixa.appendChild(aviso);
     var antes = NL.gems;
-    fn.httpsCallable("criarPix")({ pacote: pacote }).then(function (r) {
-      var d = r.data;
+    chamar("/pix", { pacote: pacote }).then(function (d) {
       j.caixa.removeChild(aviso);
       j.caixa.appendChild(el("h2", "margin:0 0 6px;color:#ffe2a0", d.joias + " joias — R$ " + d.preco.toFixed(2).replace(".", ",")));
       j.caixa.appendChild(el("p", "margin:0 0 10px;font-size:14px", "Abra o app do seu banco, escolha Pix e leia o QR Code. Vale por 30 minutos."));
@@ -204,7 +208,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":5561184,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":5561200,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
