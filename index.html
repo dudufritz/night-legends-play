@@ -177,12 +177,13 @@ body {
       j.caixa.appendChild(estado);
       j.caixa.appendChild(botao("Fechar", function () { clearInterval(olho); j.fechar(); }));
       var olho = setInterval(function () {
+        chamar("/conferir", { pedido: d.pedido }).catch(function () {});
         if (NL.gems > antes) {
           clearInterval(olho);
           estado.textContent = "Pagamento recebido! Joias adicionadas.";
           setTimeout(j.fechar, 2500);
         }
-      }, 1000);
+      }, 5000);
     }).catch(function () {
       aviso.textContent = "Não foi possível gerar o Pix agora. Tente de novo em instantes.";
       j.caixa.appendChild(botao("Fechar", j.fechar));
@@ -208,7 +209,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":5561200,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":5561152,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
