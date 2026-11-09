@@ -81,18 +81,31 @@ body {
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 <script>
 (function () {
   // Cole aqui a configuração do Firebase (Configurações do projeto → Seus apps → Web)
   var cfg = { apiKey: "", authDomain: "", projectId: "", appId: "" };
-  var NL = window.NL = { ready: false, user: null, tick: 0, cloud: null };
+  // Mude para true depois de publicar o servidor do Pix (COMO-ATIVAR-PIX.md)
+  var PIX_ATIVO = false;
+  var NL = window.NL = { ready: false, user: null, tick: 0, cloud: null, gems: 0, msg: "" };
   if (!cfg.apiKey || typeof firebase === "undefined") return;
   firebase.initializeApp(cfg);
   var auth = firebase.auth(), db = firebase.firestore();
+  var fn = firebase.app().functions("southamerica-east1");
+  var parar = null;
   NL.ready = true;
   auth.onAuthStateChanged(function (u) {
     NL.user = u ? { uid: u.uid, name: u.displayName || "", email: u.email || "" } : null;
     NL.tick++;
+    if (parar) { parar(); parar = null; }
+    NL.gems = 0;
+    if (u) {
+      // Carteira de joias: só o servidor grava; aqui só acompanhamos o saldo
+      parar = db.doc("users/" + u.uid + "/carteira/saldo").onSnapshot(function (d) {
+        NL.gems = (d.exists && d.data().joias) || 0;
+      }, function () {});
+    }
   });
   NL.login = function () {
     var p = new firebase.auth.GoogleAuthProvider();
@@ -109,6 +122,67 @@ body {
     db.collection("users").doc(NL.user.uid).collection("saves").get().then(function (s) {
       var o = {}; s.forEach(function (d) { o[d.id] = d.data().data; }); NL.cloud = JSON.stringify(o);
     }).catch(function () { NL.cloud = "{}"; });
+  };
+  NL.gastar = function (n) {
+    if (!NL.user) return;
+    fn.httpsCallable("gastarJoias")({ quantidade: n }).catch(function () {});
+  };
+
+  // ---------- Pix ----------
+  function el(tag, css, txt) {
+    var e = document.createElement(tag);
+    if (css) e.style.cssText = css;
+    if (txt) e.textContent = txt;
+    return e;
+  }
+  function janela() {
+    var fundo = el("div", "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif");
+    var caixa = el("div", "background:#1a120c;border:2px solid #d9a85a;border-radius:10px;padding:22px;max-width:360px;width:90%;color:#f4e6c8;text-align:center");
+    fundo.appendChild(caixa);
+    document.body.appendChild(fundo);
+    return { fundo: fundo, caixa: caixa, fechar: function () { if (fundo.parentNode) fundo.parentNode.removeChild(fundo); } };
+  }
+  function botao(txt, f) {
+    var b = el("button", "margin-top:12px;padding:10px 18px;background:#c07f33;border:0;border-radius:6px;color:#1a0f08;font-weight:bold;font-size:15px;cursor:pointer;width:100%", txt);
+    b.onclick = f;
+    return b;
+  }
+  if (PIX_ATIVO) NL.pix = function (pacote) {
+    var j = janela();
+    if (!NL.user) {
+      j.caixa.appendChild(el("p", "font-size:17px", "Entre com Google (no menu do jogo) para comprar joias. Assim elas ficam guardadas na sua conta."));
+      j.caixa.appendChild(botao("Fechar", j.fechar));
+      return;
+    }
+    var aviso = el("p", "font-size:17px", "Gerando o Pix...");
+    j.caixa.appendChild(aviso);
+    var antes = NL.gems;
+    fn.httpsCallable("criarPix")({ pacote: pacote }).then(function (r) {
+      var d = r.data;
+      j.caixa.removeChild(aviso);
+      j.caixa.appendChild(el("h2", "margin:0 0 6px;color:#ffe2a0", d.joias + " joias — R$ " + d.preco.toFixed(2).replace(".", ",")));
+      j.caixa.appendChild(el("p", "margin:0 0 10px;font-size:14px", "Abra o app do seu banco, escolha Pix e leia o QR Code. Vale por 30 minutos."));
+      var img = el("img", "width:220px;height:220px;background:#fff;padding:8px;border-radius:6px");
+      img.src = "data:image/png;base64," + d.qrBase64;
+      j.caixa.appendChild(img);
+      j.caixa.appendChild(botao("Copiar código Pix (copia e cola)", function () {
+        navigator.clipboard.writeText(d.copiaECola);
+        this.textContent = "Copiado!";
+      }));
+      var estado = el("p", "font-size:14px;color:#9fe0a0", "Aguardando o pagamento...");
+      j.caixa.appendChild(estado);
+      j.caixa.appendChild(botao("Fechar", function () { clearInterval(olho); j.fechar(); }));
+      var olho = setInterval(function () {
+        if (NL.gems > antes) {
+          clearInterval(olho);
+          estado.textContent = "Pagamento recebido! Joias adicionadas.";
+          setTimeout(j.fechar, 2500);
+        }
+      }, 1000);
+    }).catch(function () {
+      aviso.textContent = "Não foi possível gerar o Pix agora. Tente de novo em instantes.";
+      j.caixa.appendChild(botao("Fechar", j.fechar));
+    });
   };
 })();
 </script>
@@ -130,7 +204,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":5559024,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":5561024,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
