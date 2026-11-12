@@ -76,8 +76,8 @@ body {
 	z-index: 1;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v2-0.icon.png" />
-<link rel="apple-touch-icon" href="nl-v2-0.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v2-1.icon.png" />
+<link rel="apple-touch-icon" href="nl-v2-1.apple-touch-icon.png"/>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -127,6 +127,29 @@ body {
     db.collection("users").doc(NL.user.uid).collection("saves").get().then(function (s) {
       var o = {}; s.forEach(function (d) { o[d.id] = d.data().data; }); NL.cloud = JSON.stringify(o);
     }).catch(function () { NL.cloud = "{}"; });
+  };
+  // ---------- Ranking global (coleção "ranking", um documento por jogador) ----------
+  NL.rank = null;
+  NL.rankEnviar = function (json) {
+    if (!NL.user) return;
+    var d = JSON.parse(json);
+    var ref = db.collection("ranking").doc(NL.user.uid);
+    ref.get().then(function (s) {
+      if (s.exists && (s.data().pontos || 0) >= d.pontos) return;  // só guarda a melhor partida
+      d.t = Date.now();
+      return ref.set(d);
+    }).catch(function () {});
+  };
+  NL.rankBuscar = function () {
+    NL.rank = null;
+    db.collection("ranking").orderBy("pontos", "desc").limit(50).get().then(function (s) {
+      var a = [];
+      s.forEach(function (x) {
+        var v = x.data();
+        a.push({ nome: v.nome || "?", noite: v.noite || 0, nivel: v.nivel || 0, dano: v.dano || 0, arma: v.arma || "", eu: !!(NL.user && x.id === NL.user.uid) });
+      });
+      NL.rank = JSON.stringify(a);
+    }).catch(function () { NL.rank = "erro"; });
   };
   NL.gastar = function (n) {
     if (!NL.user) return;
@@ -202,14 +225,14 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" src="nl-v2-0.png" alt="">
+			<img id="status-splash" src="nl-v2-1.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="nl-v2-0.js"></script>
+		<script src="nl-v2-1.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v2-0","experimentalVK":false,"fileSizes":{"nl-v2-0.pck":51809536,"nl-v2-0.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v2-1","experimentalVK":false,"fileSizes":{"nl-v2-1.pck":52013344,"nl-v2-1.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
