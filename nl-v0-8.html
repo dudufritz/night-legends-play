@@ -76,8 +76,8 @@ body {
 	z-index: 1;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v0-7.icon.png" />
-<link rel="apple-touch-icon" href="nl-v0-7.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v0-8.icon.png" />
+<link rel="apple-touch-icon" href="nl-v0-8.apple-touch-icon.png"/>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -164,10 +164,11 @@ body {
       return ref.set(d);
     }).catch(function () {});
   };
-  // Campeonato: 01/12/2026 a 31/12/2026 (prêmio ao 1º do ranking global). Antes disso vale a pré-temporada.
-  NL.campInicio = Date.UTC(2026, 11, 1);
-  NL.campFim = Date.UTC(2027, 0, 1);
-  NL.rankInicio = Date.now() >= NL.campInicio ? NL.campInicio : Date.UTC(2026, 10, 13);
+  // Temporada do ranking: o que foi gravado antes de rankInicio não conta. Para fazer um torneio, ponha a data de início
+  // em rankInicio e a de fim em campFim (as partidas fora desse período não aparecem nem são enviadas).
+  NL.campInicio = Date.UTC(2026, 10, 13);
+  NL.campFim = Date.UTC(2100, 0, 1);
+  NL.rankInicio = NL.campInicio;
   NL.rankBuscar = function () {
     NL.rank = null;
     db.collection("ranking").orderBy("pontos", "desc").limit(300).get().then(function (s) {
@@ -275,14 +276,14 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" src="nl-v0-7.png" alt="">
+			<img id="status-splash" src="nl-v0-8.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="nl-v0-7.js"></script>
+		<script src="nl-v0-8.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v0-7","experimentalVK":false,"fileSizes":{"nl-v0-7.pck":60994080,"nl-v0-7.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v0-8","experimentalVK":false,"fileSizes":{"nl-v0-8.pck":60994944,"nl-v0-8.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
