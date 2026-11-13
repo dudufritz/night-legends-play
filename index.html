@@ -76,8 +76,8 @@ body {
 	z-index: 1;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v0-5.icon.png" />
-<link rel="apple-touch-icon" href="nl-v0-5.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v0-6.icon.png" />
+<link rel="apple-touch-icon" href="nl-v0-6.apple-touch-icon.png"/>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -133,9 +133,10 @@ body {
   NL.rankEnviar = function (json) {
     if (!NL.user) return;
     var d = JSON.parse(json);
-    var ref = db.collection("ranking_v02").doc(NL.user.uid);
+    var ref = db.collection("ranking").doc(NL.user.uid);
     ref.get().then(function (s) {
-      if (s.exists && (s.data().pontos || 0) >= d.pontos) return;  // só guarda a melhor partida
+      // só guarda a melhor partida da temporada atual (linhas antigas, de antes da 0.2, são substituídas)
+      if (s.exists && (s.data().t || 0) >= NL.rankInicio && (s.data().pontos || 0) >= d.pontos) return;
       d.t = Date.now();
       return ref.set(d);
     }).catch(function () {});
@@ -143,7 +144,7 @@ body {
   NL.rankNome = function (json) {
     if (!NL.user) return;
     var nome = JSON.parse(json);
-    var ref = db.collection("ranking_v02").doc(NL.user.uid);
+    var ref = db.collection("ranking").doc(NL.user.uid);
     ref.get().then(function (s) {
       if (!s.exists) return;
       var d = s.data();
@@ -151,12 +152,14 @@ body {
       return ref.set(d);
     }).catch(function () {});
   };
+  NL.rankInicio = Date.UTC(2026, 10, 13);  // início da temporada 0.2: o que veio antes não conta
   NL.rankBuscar = function () {
     NL.rank = null;
-    db.collection("ranking_v02").orderBy("pontos", "desc").limit(50).get().then(function (s) {
+    db.collection("ranking").orderBy("pontos", "desc").limit(200).get().then(function (s) {
       var a = [];
       s.forEach(function (x) {
         var v = x.data();
+        if ((v.t || 0) < NL.rankInicio || a.length >= 50) return;
         a.push({ nome: v.nome || "?", noite: v.noite || 0, nivel: v.nivel || 0, dano: v.dano || 0, arma: v.arma || "", eu: !!(NL.user && x.id === NL.user.uid) });
       });
       NL.rank = JSON.stringify(a);
@@ -236,14 +239,14 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" src="nl-v0-5.png" alt="">
+			<img id="status-splash" src="nl-v0-6.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="nl-v0-5.js"></script>
+		<script src="nl-v0-6.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v0-5","experimentalVK":false,"fileSizes":{"nl-v0-5.pck":58857136,"nl-v0-5.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v0-6","experimentalVK":false,"fileSizes":{"nl-v0-6.pck":60980768,"nl-v0-6.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
