@@ -76,8 +76,8 @@ body {
 	z-index: 1;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v0-6.icon.png" />
-<link rel="apple-touch-icon" href="nl-v0-6.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v0-7.icon.png" />
+<link rel="apple-touch-icon" href="nl-v0-7.apple-touch-icon.png"/>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -100,8 +100,19 @@ body {
   }
   var parar = null;
   NL.ready = true;
+  // Dono do jogo: não vê anúncios. Comparamos só o hash do e-mail (o e-mail não fica escrito no código).
+  NL.dono = false;
+  var HASH_DONO = "8b1c0dfd6e225a62c3ec2168f8b8ce3a50910cefcc9674fb30f95540319529cd";
+  function sha256hex(txt) {
+    if (!window.crypto || !crypto.subtle) return Promise.resolve("");
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)).then(function (b) {
+      return Array.prototype.map.call(new Uint8Array(b), function (x) { return ("0" + x.toString(16)).slice(-2); }).join("");
+    });
+  }
   auth.onAuthStateChanged(function (u) {
     NL.user = u ? { uid: u.uid, name: u.displayName || "", email: u.email || "" } : null;
+    NL.dono = false;
+    if (u && u.email && u.emailVerified !== false) sha256hex(u.email.trim().toLowerCase()).then(function (h) { NL.dono = (h === HASH_DONO); });
     NL.tick++;
     if (parar) { parar(); parar = null; }
     NL.gems = 0;
@@ -132,6 +143,7 @@ body {
   NL.rank = null;
   NL.rankEnviar = function (json) {
     if (!NL.user) return;
+    if (Date.now() >= NL.campFim) return;  // o campeonato acabou
     var d = JSON.parse(json);
     var ref = db.collection("ranking").doc(NL.user.uid);
     ref.get().then(function (s) {
@@ -152,18 +164,42 @@ body {
       return ref.set(d);
     }).catch(function () {});
   };
-  NL.rankInicio = Date.UTC(2026, 10, 13);  // início da temporada 0.2: o que veio antes não conta
+  // Campeonato: 01/12/2026 a 31/12/2026 (prêmio ao 1º do ranking global). Antes disso vale a pré-temporada.
+  NL.campInicio = Date.UTC(2026, 11, 1);
+  NL.campFim = Date.UTC(2027, 0, 1);
+  NL.rankInicio = Date.now() >= NL.campInicio ? NL.campInicio : Date.UTC(2026, 10, 13);
   NL.rankBuscar = function () {
     NL.rank = null;
-    db.collection("ranking").orderBy("pontos", "desc").limit(200).get().then(function (s) {
+    db.collection("ranking").orderBy("pontos", "desc").limit(300).get().then(function (s) {
       var a = [];
       s.forEach(function (x) {
         var v = x.data();
-        if ((v.t || 0) < NL.rankInicio || a.length >= 50) return;
+        if ((v.t || 0) < NL.rankInicio || (v.t || 0) >= NL.campFim || a.length >= 50) return;
         a.push({ nome: v.nome || "?", noite: v.noite || 0, nivel: v.nivel || 0, dano: v.dano || 0, arma: v.arma || "", eu: !!(NL.user && x.id === NL.user.uid) });
       });
       NL.rank = JSON.stringify(a);
     }).catch(function () { NL.rank = "erro"; });
+  };
+  // ---------- Anúncios ----------
+  // Para usar uma rede de anúncios de verdade (Google AdSense para jogos), preencha ADS_CLIENT
+  // (veja COMO-ATIVAR-ANUNCIOS.md). Enquanto estiver vazio, o jogo mostra o anúncio da casa (divulgação do campeonato).
+  NL.ADS_CLIENT = "";
+  NL.adRes = "";
+  NL.adsAtivo = function () { return !!NL.ADS_CLIENT && typeof window.adBreak === "function"; };
+  NL.adPedir = function (tipo) {
+    NL.adRes = "";
+    if (!NL.adsAtivo()) { NL.adRes = "sem_rede"; return; }
+    var feito = false;
+    function fim(r) { if (!feito) { feito = true; NL.adRes = r; } }
+    try {
+      if (tipo === "recompensa") {
+        window.adBreak({ type: "reward", name: "recompensa", beforeReward: function (mostrar) { mostrar(); }, adViewed: function () { fim("ok"); },
+          adDismissed: function () { fim("pulou"); }, adBreakDone: function (i) { if (!feito) fim(i && i.breakStatus === "viewed" ? "ok" : "falhou"); } });
+      } else {
+        window.adBreak({ type: "start", name: tipo, adBreakDone: function () { fim("ok"); } });
+      }
+    } catch (e) { fim("falhou"); }
+    setTimeout(function () { fim("falhou"); }, 45000);
   };
   NL.gastar = function (n) {
     if (!NL.user) return;
@@ -239,14 +275,14 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" src="nl-v0-6.png" alt="">
+			<img id="status-splash" src="nl-v0-7.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="nl-v0-6.js"></script>
+		<script src="nl-v0-7.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v0-6","experimentalVK":false,"fileSizes":{"nl-v0-6.pck":60980768,"nl-v0-6.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v0-7","experimentalVK":false,"fileSizes":{"nl-v0-7.pck":60994080,"nl-v0-7.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
