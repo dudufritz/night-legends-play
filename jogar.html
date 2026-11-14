@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<title>Night Legends</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: #242424;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+		</style>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v0-15.icon.png" />
+<link rel="apple-touch-icon" href="nl-v0-15.apple-touch-icon.png"/>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2692661157744513" crossorigin="anonymous"></script>
+<script>
+(function(){
+  var K="nl_consent";
+  try{ window.adsbygoogle=window.adsbygoogle||[]; }catch(e){}
+  function ler(){ try{return localStorage.getItem(K);}catch(e){return null;} }
+  function aplicar(v){ if(v==="nao"){ try{ (window.adsbygoogle=window.adsbygoogle||[]).requestNonPersonalizedAds=1; }catch(e){} } }
+  window.NL=window.NL||{}; window.NL.consent=ler();
+  aplicar(ler());
+  function banner(){
+    if(ler()) return;
+    var d=document.createElement("div");
+    d.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1a1210;color:#eadfcb;border-top:2px solid #f2c46a;padding:12px 16px;font:14px Georgia,serif;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center";
+    d.innerHTML='<span style="max-width:620px">Usamos cookies para salvar o progresso e exibir anúncios. Aceitando, os anúncios podem ser personalizados. <a href="privacidade.html" target="_blank" style="color:#f2c46a">Privacidade</a></span>';
+    function b(t,v,pri){ var x=document.createElement("button"); x.textContent=t; x.style.cssText="padding:8px 16px;border:1px solid #f2c46a;border-radius:6px;cursor:pointer;font:14px Georgia,serif;"+(pri?"background:#f2c46a;color:#120d0a":"background:transparent;color:#f2c46a"); x.onclick=function(){ try{localStorage.setItem(K,v);}catch(e){} window.NL.consent=v; aplicar(v); d.remove(); }; return x; }
+    d.appendChild(b("Aceitar","sim",true)); d.appendChild(b("Recusar","nao",false));
+    document.body.appendChild(d);
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",banner); else banner();
+})();
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  // Cole aqui a configuração do Firebase (Configurações do projeto → Seus apps → Web)
+  var cfg = { apiKey: "AIzaSyBJyn9J3Nv5dU7h5Uv-l_Ummowv1ik_G7E", authDomain: "night-legends-4a762.firebaseapp.com", projectId: "night-legends-4a762", appId: "1:218207544089:web:85a9b146a9aa5ef2b69b88" };
+  // Endereço do servidor do Pix na Cloudflare (vazio = Pix desligado)
+  var SERVIDOR = "https://night-legends-pix.eduardosolifritz.workers.dev";
+  var NL = window.NL = { ready: false, user: null, tick: 0, cloud: null, gems: 0, msg: "" };
+  if (!cfg.apiKey || typeof firebase === "undefined") return;
+  firebase.initializeApp(cfg);
+  var auth = firebase.auth(), db = firebase.firestore();
+  function chamar(rota, dados) {
+    return auth.currentUser.getIdToken().then(function (tk) {
+      return fetch(SERVIDOR + rota, { method: "POST", headers: { "Authorization": "Bearer " + tk, "Content-Type": "application/json" }, body: JSON.stringify(dados) });
+    }).then(function (r) {
+      return r.json().then(function (j) { if (!r.ok) throw new Error(j.erro || "erro"); return j; });
+    });
+  }
+  var parar = null;
+  NL.ready = true;
+  // Dono do jogo: não vê anúncios. Comparamos só o hash do e-mail (o e-mail não fica escrito no código).
+  NL.dono = false;
+  var HASH_DONO = "8b1c0dfd6e225a62c3ec2168f8b8ce3a50910cefcc9674fb30f95540319529cd";
+  function sha256hex(txt) {
+    if (!window.crypto || !crypto.subtle) return Promise.resolve("");
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)).then(function (b) {
+      return Array.prototype.map.call(new Uint8Array(b), function (x) { return ("0" + x.toString(16)).slice(-2); }).join("");
+    });
+  }
+  auth.onAuthStateChanged(function (u) {
+    NL.user = u ? { uid: u.uid, name: u.displayName || "", email: u.email || "" } : null;
+    NL.dono = false;
+    if (u && u.email && u.emailVerified !== false) sha256hex(u.email.trim().toLowerCase()).then(function (h) { NL.dono = (h === HASH_DONO); });
+    NL.tick++;
+    if (parar) { parar(); parar = null; }
+    NL.gems = 0;
+    if (u) {
+      // Carteira de joias: só o servidor grava; aqui só acompanhamos o saldo
+      parar = db.doc("users/" + u.uid + "/carteira/saldo").onSnapshot(function (d) {
+        NL.gems = (d.exists && d.data().joias) || 0;
+      }, function () {});
+    }
+  });
+  NL.login = function () {
+    var p = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(p).catch(function (e) { if (e && e.code === "auth/popup-blocked") auth.signInWithRedirect(p); });
+  };
+  NL.logout = function () { auth.signOut(); };
+  NL.save = function (slot, json) {
+    if (!NL.user) return;
+    db.collection("users").doc(NL.user.uid).collection("saves").doc("slot" + slot).set({ data: json, t: Date.now() });
+  };
+  NL.loadAll = function () {
+    NL.cloud = null;
+    if (!NL.user) return;
+    db.collection("users").doc(NL.user.uid).collection("saves").get().then(function (s) {
+      var o = {}; s.forEach(function (d) { o[d.id] = d.data().data; }); NL.cloud = JSON.stringify(o);
+    }).catch(function () { NL.cloud = "{}"; });
+  };
+  // ---------- Ranking global (coleção "ranking", um documento por jogador) ----------
+  NL.rank = null;
+  NL.rankEnviar = function (json) {
+    if (!NL.user) return;
+    if (Date.now() >= NL.campFim) return;  // o campeonato acabou
+    var d = JSON.parse(json);
+    var ref = db.collection("ranking").doc(NL.user.uid);
+    ref.get().then(function (s) {
+      // só guarda a melhor partida da temporada atual (linhas antigas, de antes da 0.2, são substituídas)
+      if (s.exists && (s.data().t || 0) >= NL.rankInicio && (s.data().pontos || 0) >= d.pontos) return;
+      d.t = Date.now();
+      return ref.set(d);
+    }).catch(function () {});
+  };
+  NL.rankNome = function (json) {
+    if (!NL.user) return;
+    var nome = JSON.parse(json);
+    var ref = db.collection("ranking").doc(NL.user.uid);
+    ref.get().then(function (s) {
+      if (!s.exists) return;
+      var d = s.data();
+      d.nome = String(nome).slice(0, 40);
+      return ref.set(d);
+    }).catch(function () {});
+  };
+  // Temporada do ranking: o que foi gravado antes de rankInicio não conta. Para fazer um torneio, ponha a data de início
+  // em rankInicio e a de fim em campFim (as partidas fora desse período não aparecem nem são enviadas).
+  NL.campInicio = Date.UTC(2026, 10, 13);
+  NL.campFim = Date.UTC(2100, 0, 1);
+  NL.rankInicio = NL.campInicio;
+  NL.rankBuscar = function () {
+    NL.rank = null;
+    db.collection("ranking").orderBy("pontos", "desc").limit(300).get().then(function (s) {
+      var a = [];
+      s.forEach(function (x) {
+        var v = x.data();
+        if ((v.t || 0) < NL.rankInicio || (v.t || 0) >= NL.campFim || a.length >= 50) return;
+        a.push({ nome: v.nome || "?", noite: v.noite || 0, nivel: v.nivel || 0, dano: v.dano || 0, arma: v.arma || "", eu: !!(NL.user && x.id === NL.user.uid) });
+      });
+      NL.rank = JSON.stringify(a);
+    }).catch(function () { NL.rank = "erro"; });
+  };
+  // ---------- Anúncios ----------
+  // Para usar uma rede de anúncios de verdade (Google AdSense para jogos), preencha ADS_CLIENT
+  // (veja COMO-ATIVAR-ANUNCIOS.md). Enquanto estiver vazio, o jogo mostra o anúncio da casa (divulgação do campeonato).
+  NL.ADS_CLIENT = "ca-pub-2692661157744513";
+  NL.adRes = "";
+  NL.adsAtivo = function () { return !!NL.ADS_CLIENT && typeof window.adBreak === "function"; };
+  NL.adPedir = function (tipo) {
+    NL.adRes = "";
+    if (!NL.adsAtivo()) { NL.adRes = "sem_rede"; return; }
+    var feito = false;
+    function fim(r) { if (!feito) { feito = true; NL.adRes = r; } }
+    try {
+      if (tipo === "recompensa") {
+        window.adBreak({ type: "reward", name: "recompensa", beforeReward: function (mostrar) { mostrar(); }, adViewed: function () { fim("ok"); },
+          adDismissed: function () { fim("pulou"); }, adBreakDone: function (i) { if (!feito) fim(i && i.breakStatus === "viewed" ? "ok" : "falhou"); } });
+      } else {
+        window.adBreak({ type: "start", name: tipo, adBreakDone: function () { fim("ok"); } });
+      }
+    } catch (e) { fim("falhou"); }
+    setTimeout(function () { fim("falhou"); }, 45000);
+  };
+  NL.gastar = function (n) {
+    if (!NL.user) return;
+    if (SERVIDOR) chamar("/gastar", { quantidade: n }).catch(function () {});
+  };
+
+  // ---------- Pix ----------
+  function el(tag, css, txt) {
+    var e = document.createElement(tag);
+    if (css) e.style.cssText = css;
+    if (txt) e.textContent = txt;
+    return e;
+  }
+  function janela() {
+    var fundo = el("div", "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif");
+    var caixa = el("div", "background:#1a120c;border:2px solid #d9a85a;border-radius:10px;padding:22px;max-width:360px;width:90%;color:#f4e6c8;text-align:center");
+    fundo.appendChild(caixa);
+    document.body.appendChild(fundo);
+    return { fundo: fundo, caixa: caixa, fechar: function () { if (fundo.parentNode) fundo.parentNode.removeChild(fundo); } };
+  }
+  function botao(txt, f) {
+    var b = el("button", "margin-top:12px;padding:10px 18px;background:#c07f33;border:0;border-radius:6px;color:#1a0f08;font-weight:bold;font-size:15px;cursor:pointer;width:100%", txt);
+    b.onclick = f;
+    return b;
+  }
+  if (SERVIDOR) NL.pix = function (pacote) {
+    var j = janela();
+    if (!NL.user) {
+      j.caixa.appendChild(el("p", "font-size:17px", "Entre com Google (no menu do jogo) para comprar joias. Assim elas ficam guardadas na sua conta."));
+      j.caixa.appendChild(botao("Fechar", j.fechar));
+      return;
+    }
+    var aviso = el("p", "font-size:17px", "Gerando o Pix...");
+    j.caixa.appendChild(aviso);
+    var antes = NL.gems;
+    chamar("/pix", { pacote: pacote }).then(function (d) {
+      j.caixa.removeChild(aviso);
+      j.caixa.appendChild(el("h2", "margin:0 0 6px;color:#ffe2a0", d.joias + " joias — R$ " + d.preco.toFixed(2).replace(".", ",")));
+      j.caixa.appendChild(el("p", "margin:0 0 10px;font-size:14px", "Abra o app do seu banco, escolha Pix e leia o QR Code. Vale por 30 minutos."));
+      var img = el("img", "width:220px;height:220px;background:#fff;padding:8px;border-radius:6px");
+      img.src = "data:image/png;base64," + d.qrBase64;
+      j.caixa.appendChild(img);
+      j.caixa.appendChild(botao("Copiar código Pix (copia e cola)", function () {
+        navigator.clipboard.writeText(d.copiaECola);
+        this.textContent = "Copiado!";
+      }));
+      var estado = el("p", "font-size:14px;color:#9fe0a0", "Aguardando o pagamento...");
+      j.caixa.appendChild(estado);
+      j.caixa.appendChild(botao("Fechar", function () { clearInterval(olho); j.fechar(); }));
+      var olho = setInterval(function () {
+        chamar("/conferir", { pedido: d.pedido }).catch(function () {});
+        if (NL.gems > antes) {
+          clearInterval(olho);
+          estado.textContent = "Pagamento recebido! Joias adicionadas.";
+          setTimeout(j.fechar, 2500);
+        }
+      }, 5000);
+    }).catch(function () {
+      aviso.textContent = "Não foi possível gerar o Pix agora. Tente de novo em instantes.";
+      j.caixa.appendChild(botao("Fechar", j.fechar));
+    });
+  };
+})();
+</script>
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" src="nl-v0-15.png" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+		</div>
+
+		<script src="nl-v0-15.js"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v0-15","experimentalVK":false,"fileSizes":{"nl-v0-15.pck":61214032,"nl-v0-15.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occured');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				navigator.serviceWorker.getRegistration().then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			}).then(() => {
+				window.location.reload();
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	</body>
+</html>
+

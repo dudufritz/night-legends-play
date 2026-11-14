@@ -1,3 +1,4 @@
-# Night Legends — versão para testers
+# Night Legends
 
-Jogue no navegador: https://dudufritz.github.io/night-legends-play/
+Site: https://nightlegends.com.br
+Jogo: https://nightlegends.com.br/jogar.html

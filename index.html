@@ -1,406 +1,88 @@
-<!DOCTYPE html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
-		<title>Night Legends</title>
-		<style>
-html, body, #canvas {
-	margin: 0;
-	padding: 0;
-	border: 0;
-}
-
-body {
-	color: white;
-	background-color: black;
-	overflow: hidden;
-	touch-action: none;
-}
-
-#canvas {
-	display: block;
-}
-
-#canvas:focus {
-	outline: none;
-}
-
-#status, #status-splash, #status-progress {
-	position: absolute;
-	left: 0;
-	right: 0;
-}
-
-#status, #status-splash {
-	top: 0;
-	bottom: 0;
-}
-
-#status {
-	background-color: #242424;
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	visibility: hidden;
-}
-
-#status-splash {
-	max-height: 100%;
-	max-width: 100%;
-	margin: auto;
-}
-
-#status-progress, #status-notice {
-	display: none;
-}
-
-#status-progress {
-	bottom: 10%;
-	width: 50%;
-	margin: 0 auto;
-}
-
-#status-notice {
-	background-color: #5b3943;
-	border-radius: 0.5rem;
-	border: 1px solid #9b3943;
-	color: #e0e0e0;
-	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
-	line-height: 1.3;
-	margin: 0 2rem;
-	overflow: hidden;
-	padding: 1rem;
-	text-align: center;
-	z-index: 1;
-}
-		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="nl-v0-15.icon.png" />
-<link rel="apple-touch-icon" href="nl-v0-15.apple-touch-icon.png"/>
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Night Legends — Lendas do Folclore Brasileiro</title>
+<meta name="description" content="Night Legends é um jogo de ação gratuito no navegador: sobreviva às noites da Mata Fechada, receba bênçãos de lendas do folclore brasileiro e enfrente o Barão.">
+<link rel="icon" href="nl-v0-15.icon.png">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2692661157744513" crossorigin="anonymous"></script>
-<script>
-(function(){
-  var K="nl_consent";
-  try{ window.adsbygoogle=window.adsbygoogle||[]; }catch(e){}
-  function ler(){ try{return localStorage.getItem(K);}catch(e){return null;} }
-  function aplicar(v){ if(v==="nao"){ try{ (window.adsbygoogle=window.adsbygoogle||[]).requestNonPersonalizedAds=1; }catch(e){} } }
-  window.NL=window.NL||{}; window.NL.consent=ler();
-  aplicar(ler());
-  function banner(){
-    if(ler()) return;
-    var d=document.createElement("div");
-    d.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1a1210;color:#eadfcb;border-top:2px solid #f2c46a;padding:12px 16px;font:14px Georgia,serif;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center";
-    d.innerHTML='<span style="max-width:620px">Usamos cookies para salvar o progresso e exibir anúncios. Aceitando, os anúncios podem ser personalizados. <a href="privacidade.html" target="_blank" style="color:#f2c46a">Privacidade</a></span>';
-    function b(t,v,pri){ var x=document.createElement("button"); x.textContent=t; x.style.cssText="padding:8px 16px;border:1px solid #f2c46a;border-radius:6px;cursor:pointer;font:14px Georgia,serif;"+(pri?"background:#f2c46a;color:#120d0a":"background:transparent;color:#f2c46a"); x.onclick=function(){ try{localStorage.setItem(K,v);}catch(e){} window.NL.consent=v; aplicar(v); d.remove(); }; return x; }
-    d.appendChild(b("Aceitar","sim",true)); d.appendChild(b("Recusar","nao",false));
-    document.body.appendChild(d);
-  }
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",banner); else banner();
-})();
-</script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>
-(function () {
-  // Cole aqui a configuração do Firebase (Configurações do projeto → Seus apps → Web)
-  var cfg = { apiKey: "AIzaSyBJyn9J3Nv5dU7h5Uv-l_Ummowv1ik_G7E", authDomain: "night-legends-4a762.firebaseapp.com", projectId: "night-legends-4a762", appId: "1:218207544089:web:85a9b146a9aa5ef2b69b88" };
-  // Endereço do servidor do Pix na Cloudflare (vazio = Pix desligado)
-  var SERVIDOR = "https://night-legends-pix.eduardosolifritz.workers.dev";
-  var NL = window.NL = { ready: false, user: null, tick: 0, cloud: null, gems: 0, msg: "" };
-  if (!cfg.apiKey || typeof firebase === "undefined") return;
-  firebase.initializeApp(cfg);
-  var auth = firebase.auth(), db = firebase.firestore();
-  function chamar(rota, dados) {
-    return auth.currentUser.getIdToken().then(function (tk) {
-      return fetch(SERVIDOR + rota, { method: "POST", headers: { "Authorization": "Bearer " + tk, "Content-Type": "application/json" }, body: JSON.stringify(dados) });
-    }).then(function (r) {
-      return r.json().then(function (j) { if (!r.ok) throw new Error(j.erro || "erro"); return j; });
-    });
-  }
-  var parar = null;
-  NL.ready = true;
-  // Dono do jogo: não vê anúncios. Comparamos só o hash do e-mail (o e-mail não fica escrito no código).
-  NL.dono = false;
-  var HASH_DONO = "8b1c0dfd6e225a62c3ec2168f8b8ce3a50910cefcc9674fb30f95540319529cd";
-  function sha256hex(txt) {
-    if (!window.crypto || !crypto.subtle) return Promise.resolve("");
-    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)).then(function (b) {
-      return Array.prototype.map.call(new Uint8Array(b), function (x) { return ("0" + x.toString(16)).slice(-2); }).join("");
-    });
-  }
-  auth.onAuthStateChanged(function (u) {
-    NL.user = u ? { uid: u.uid, name: u.displayName || "", email: u.email || "" } : null;
-    NL.dono = false;
-    if (u && u.email && u.emailVerified !== false) sha256hex(u.email.trim().toLowerCase()).then(function (h) { NL.dono = (h === HASH_DONO); });
-    NL.tick++;
-    if (parar) { parar(); parar = null; }
-    NL.gems = 0;
-    if (u) {
-      // Carteira de joias: só o servidor grava; aqui só acompanhamos o saldo
-      parar = db.doc("users/" + u.uid + "/carteira/saldo").onSnapshot(function (d) {
-        NL.gems = (d.exists && d.data().joias) || 0;
-      }, function () {});
-    }
-  });
-  NL.login = function () {
-    var p = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(p).catch(function (e) { if (e && e.code === "auth/popup-blocked") auth.signInWithRedirect(p); });
-  };
-  NL.logout = function () { auth.signOut(); };
-  NL.save = function (slot, json) {
-    if (!NL.user) return;
-    db.collection("users").doc(NL.user.uid).collection("saves").doc("slot" + slot).set({ data: json, t: Date.now() });
-  };
-  NL.loadAll = function () {
-    NL.cloud = null;
-    if (!NL.user) return;
-    db.collection("users").doc(NL.user.uid).collection("saves").get().then(function (s) {
-      var o = {}; s.forEach(function (d) { o[d.id] = d.data().data; }); NL.cloud = JSON.stringify(o);
-    }).catch(function () { NL.cloud = "{}"; });
-  };
-  // ---------- Ranking global (coleção "ranking", um documento por jogador) ----------
-  NL.rank = null;
-  NL.rankEnviar = function (json) {
-    if (!NL.user) return;
-    if (Date.now() >= NL.campFim) return;  // o campeonato acabou
-    var d = JSON.parse(json);
-    var ref = db.collection("ranking").doc(NL.user.uid);
-    ref.get().then(function (s) {
-      // só guarda a melhor partida da temporada atual (linhas antigas, de antes da 0.2, são substituídas)
-      if (s.exists && (s.data().t || 0) >= NL.rankInicio && (s.data().pontos || 0) >= d.pontos) return;
-      d.t = Date.now();
-      return ref.set(d);
-    }).catch(function () {});
-  };
-  NL.rankNome = function (json) {
-    if (!NL.user) return;
-    var nome = JSON.parse(json);
-    var ref = db.collection("ranking").doc(NL.user.uid);
-    ref.get().then(function (s) {
-      if (!s.exists) return;
-      var d = s.data();
-      d.nome = String(nome).slice(0, 40);
-      return ref.set(d);
-    }).catch(function () {});
-  };
-  // Temporada do ranking: o que foi gravado antes de rankInicio não conta. Para fazer um torneio, ponha a data de início
-  // em rankInicio e a de fim em campFim (as partidas fora desse período não aparecem nem são enviadas).
-  NL.campInicio = Date.UTC(2026, 10, 13);
-  NL.campFim = Date.UTC(2100, 0, 1);
-  NL.rankInicio = NL.campInicio;
-  NL.rankBuscar = function () {
-    NL.rank = null;
-    db.collection("ranking").orderBy("pontos", "desc").limit(300).get().then(function (s) {
-      var a = [];
-      s.forEach(function (x) {
-        var v = x.data();
-        if ((v.t || 0) < NL.rankInicio || (v.t || 0) >= NL.campFim || a.length >= 50) return;
-        a.push({ nome: v.nome || "?", noite: v.noite || 0, nivel: v.nivel || 0, dano: v.dano || 0, arma: v.arma || "", eu: !!(NL.user && x.id === NL.user.uid) });
-      });
-      NL.rank = JSON.stringify(a);
-    }).catch(function () { NL.rank = "erro"; });
-  };
-  // ---------- Anúncios ----------
-  // Para usar uma rede de anúncios de verdade (Google AdSense para jogos), preencha ADS_CLIENT
-  // (veja COMO-ATIVAR-ANUNCIOS.md). Enquanto estiver vazio, o jogo mostra o anúncio da casa (divulgação do campeonato).
-  NL.ADS_CLIENT = "ca-pub-2692661157744513";
-  NL.adRes = "";
-  NL.adsAtivo = function () { return !!NL.ADS_CLIENT && typeof window.adBreak === "function"; };
-  NL.adPedir = function (tipo) {
-    NL.adRes = "";
-    if (!NL.adsAtivo()) { NL.adRes = "sem_rede"; return; }
-    var feito = false;
-    function fim(r) { if (!feito) { feito = true; NL.adRes = r; } }
-    try {
-      if (tipo === "recompensa") {
-        window.adBreak({ type: "reward", name: "recompensa", beforeReward: function (mostrar) { mostrar(); }, adViewed: function () { fim("ok"); },
-          adDismissed: function () { fim("pulou"); }, adBreakDone: function (i) { if (!feito) fim(i && i.breakStatus === "viewed" ? "ok" : "falhou"); } });
-      } else {
-        window.adBreak({ type: "start", name: tipo, adBreakDone: function () { fim("ok"); } });
-      }
-    } catch (e) { fim("falhou"); }
-    setTimeout(function () { fim("falhou"); }, 45000);
-  };
-  NL.gastar = function (n) {
-    if (!NL.user) return;
-    if (SERVIDOR) chamar("/gastar", { quantidade: n }).catch(function () {});
-  };
-
-  // ---------- Pix ----------
-  function el(tag, css, txt) {
-    var e = document.createElement(tag);
-    if (css) e.style.cssText = css;
-    if (txt) e.textContent = txt;
-    return e;
-  }
-  function janela() {
-    var fundo = el("div", "position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif");
-    var caixa = el("div", "background:#1a120c;border:2px solid #d9a85a;border-radius:10px;padding:22px;max-width:360px;width:90%;color:#f4e6c8;text-align:center");
-    fundo.appendChild(caixa);
-    document.body.appendChild(fundo);
-    return { fundo: fundo, caixa: caixa, fechar: function () { if (fundo.parentNode) fundo.parentNode.removeChild(fundo); } };
-  }
-  function botao(txt, f) {
-    var b = el("button", "margin-top:12px;padding:10px 18px;background:#c07f33;border:0;border-radius:6px;color:#1a0f08;font-weight:bold;font-size:15px;cursor:pointer;width:100%", txt);
-    b.onclick = f;
-    return b;
-  }
-  if (SERVIDOR) NL.pix = function (pacote) {
-    var j = janela();
-    if (!NL.user) {
-      j.caixa.appendChild(el("p", "font-size:17px", "Entre com Google (no menu do jogo) para comprar joias. Assim elas ficam guardadas na sua conta."));
-      j.caixa.appendChild(botao("Fechar", j.fechar));
-      return;
-    }
-    var aviso = el("p", "font-size:17px", "Gerando o Pix...");
-    j.caixa.appendChild(aviso);
-    var antes = NL.gems;
-    chamar("/pix", { pacote: pacote }).then(function (d) {
-      j.caixa.removeChild(aviso);
-      j.caixa.appendChild(el("h2", "margin:0 0 6px;color:#ffe2a0", d.joias + " joias — R$ " + d.preco.toFixed(2).replace(".", ",")));
-      j.caixa.appendChild(el("p", "margin:0 0 10px;font-size:14px", "Abra o app do seu banco, escolha Pix e leia o QR Code. Vale por 30 minutos."));
-      var img = el("img", "width:220px;height:220px;background:#fff;padding:8px;border-radius:6px");
-      img.src = "data:image/png;base64," + d.qrBase64;
-      j.caixa.appendChild(img);
-      j.caixa.appendChild(botao("Copiar código Pix (copia e cola)", function () {
-        navigator.clipboard.writeText(d.copiaECola);
-        this.textContent = "Copiado!";
-      }));
-      var estado = el("p", "font-size:14px;color:#9fe0a0", "Aguardando o pagamento...");
-      j.caixa.appendChild(estado);
-      j.caixa.appendChild(botao("Fechar", function () { clearInterval(olho); j.fechar(); }));
-      var olho = setInterval(function () {
-        chamar("/conferir", { pedido: d.pedido }).catch(function () {});
-        if (NL.gems > antes) {
-          clearInterval(olho);
-          estado.textContent = "Pagamento recebido! Joias adicionadas.";
-          setTimeout(j.fechar, 2500);
-        }
-      }, 5000);
-    }).catch(function () {
-      aviso.textContent = "Não foi possível gerar o Pix agora. Tente de novo em instantes.";
-      j.caixa.appendChild(botao("Fechar", j.fechar));
-    });
-  };
-})();
-</script>
-	</head>
-	<body>
-		<canvas id="canvas">
-			Your browser does not support the canvas tag.
-		</canvas>
-
-		<noscript>
-			Your browser does not support JavaScript.
-		</noscript>
-
-		<div id="status">
-			<img id="status-splash" src="nl-v0-15.png" alt="">
-			<progress id="status-progress"></progress>
-			<div id="status-notice"></div>
-		</div>
-
-		<script src="nl-v0-15.js"></script>
-		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"nl-v0-15","experimentalVK":false,"fileSizes":{"nl-v0-15.pck":61214032,"nl-v0-15.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
-const GODOT_THREADS_ENABLED = false;
-const engine = new Engine(GODOT_CONFIG);
-
-(function () {
-	const statusOverlay = document.getElementById('status');
-	const statusProgress = document.getElementById('status-progress');
-	const statusNotice = document.getElementById('status-notice');
-
-	let initializing = true;
-	let statusMode = '';
-
-	function setStatusMode(mode) {
-		if (statusMode === mode || !initializing) {
-			return;
-		}
-		if (mode === 'hidden') {
-			statusOverlay.remove();
-			initializing = false;
-			return;
-		}
-		statusOverlay.style.visibility = 'visible';
-		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
-		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
-		statusMode = mode;
-	}
-
-	function setStatusNotice(text) {
-		while (statusNotice.lastChild) {
-			statusNotice.removeChild(statusNotice.lastChild);
-		}
-		const lines = text.split('\n');
-		lines.forEach((line) => {
-			statusNotice.appendChild(document.createTextNode(line));
-			statusNotice.appendChild(document.createElement('br'));
-		});
-	}
-
-	function displayFailureNotice(err) {
-		console.error(err);
-		if (err instanceof Error) {
-			setStatusNotice(err.message);
-		} else if (typeof err === 'string') {
-			setStatusNotice(err);
-		} else {
-			setStatusNotice('An unknown error occured');
-		}
-		setStatusMode('notice');
-		initializing = false;
-	}
-
-	const missing = Engine.getMissingFeatures({
-		threads: GODOT_THREADS_ENABLED,
-	});
-
-	if (missing.length !== 0) {
-		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
-			// There's a chance that installing the service worker would fix the issue
-			Promise.race([
-				navigator.serviceWorker.getRegistration().then((registration) => {
-					if (registration != null) {
-						return Promise.reject(new Error('Service worker already exists.'));
-					}
-					return registration;
-				}).then(() => engine.installServiceWorker()),
-				// For some reason, `getRegistration()` can stall
-				new Promise((resolve) => {
-					setTimeout(() => resolve(), 2000);
-				}),
-			]).catch((err) => {
-				console.error('Error while registering service worker:', err);
-			}).then(() => {
-				window.location.reload();
-			});
-		} else {
-			// Display the message as usual
-			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
-			displayFailureNotice(missingMsg + missing.join('\n'));
-		}
-	} else {
-		setStatusMode('progress');
-		engine.startGame({
-			'onProgress': function (current, total) {
-				if (current > 0 && total > 0) {
-					statusProgress.value = current;
-					statusProgress.max = total;
-				} else {
-					statusProgress.removeAttribute('value');
-					statusProgress.removeAttribute('max');
-				}
-			},
-		}).then(() => {
-			setStatusMode('hidden');
-		}, displayFailureNotice);
-	}
-}());
-		</script>
-	</body>
-</html>
-
+<style>
+:root{--bg:#120d0a;--bg2:#1c1410;--ouro:#f2c46a;--txt:#eadfcb;--mut:#b9a98c;--borda:#4a3822}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#2a1a10,var(--bg));color:var(--txt);font:17px/1.65 Georgia,serif}
+a{color:var(--ouro)}header,section,footer{max-width:980px;margin:0 auto;padding:0 20px}
+.hero{text-align:center;padding:64px 20px 40px}.hero h1{font-size:clamp(38px,8vw,72px);letter-spacing:.04em;margin:0;color:#f4e8cf}
+.hero p.sub{letter-spacing:.3em;text-transform:uppercase;color:var(--mut);font-size:13px;margin:8px 0 24px}
+.hero p.lead{max-width:640px;margin:0 auto 28px;font-size:19px}
+.btn{display:inline-block;background:var(--ouro);color:#1a0f08;padding:16px 38px;border-radius:8px;font-weight:bold;font-size:20px;text-decoration:none;letter-spacing:.08em;box-shadow:0 0 30px #f2c46a55}
+.btn:hover{background:#ffd98a}small{color:var(--mut)}
+h2{color:var(--ouro);border-bottom:1px solid var(--borda);padding-bottom:8px;margin-top:56px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.card{background:var(--bg2);border:1px solid var(--borda);border-radius:10px;padding:14px;text-align:center}
+.card img{border-radius:50%;margin-bottom:6px}.card h3{margin:4px 0;color:var(--ouro);font-size:17px}.card p{margin:0;font-size:14px;color:var(--mut);line-height:1.45}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--borda);padding:8px 10px;text-align:left}th{color:var(--ouro)}
+ul{padding-left:20px}li{margin:6px 0}details{background:var(--bg2);border:1px solid var(--borda);border-radius:8px;padding:10px 14px;margin:8px 0}summary{cursor:pointer;color:var(--ouro)}
+footer{text-align:center;color:var(--mut);padding:40px 20px 60px;font-size:14px;border-top:1px solid var(--borda);margin-top:56px}
+</style></head><body>
+<header class="hero">
+<h1>Night Legends</h1>
+<p class="sub">Lendas do folclore brasileiro</p>
+<p class="lead">Um jogo de ação gratuito para jogar no navegador. Sobreviva às noites da Mata Fechada com a ajuda dos Encantados do folclore e enfrente o Barão.</p>
+<a class="btn" href="jogar.html">JOGAR AGORA</a>
+<p><small>Gratuito, sem instalar nada. Funciona melhor no computador (teclado e mouse) e também em controles.</small></p>
+</header>
+<main>
+<section id="sobre"><h2>Sobre o jogo</h2>
+<p>Em <b>Night Legends</b> você é Jaci, uma jovem que volta para a casa da Vó Benta, no meio da floresta. Toda noite, criaturas surgem da mata e cercam a casa. Com a lamparina na mão, você luta, sobe de nível e escolhe bênçãos dos Encantados: os espíritos e lendas do folclore brasileiro que decidem ajudar você.</p>
+<p>Cada noite é uma partida curta de ação. Você enfrenta ondas de bichos, derrota chefes e volta para a base, onde pode cuidar da horta, conversar com a Vó Benta, comprar itens do Seu Zé Raizeiro e fortalecer o altar dos Encantados. As escolhas de bênçãos mudam toda partida: cada lenda traz ataques automáticos, poderes de esquiva, defesa e golpes diferentes que se combinam.</p>
+<p>A história avança até a noite 50, quando surge o buraco do Inferno, o caminho para enfrentar o Barão da Casa-Grande em uma luta final.</p></section>
+<section id="como-jogar"><h2>Como jogar</h2>
+<table><tr><th>Ação</th><th>Tecla</th></tr>
+<tr><td>Mover</td><td>W A S D / setas</td></tr><tr><td>Atacar</td><td>Z / clique esquerdo</td></tr>
+<tr><td>Esquivar</td><td>Espaço / clique direito</td></tr><tr><td>Poder</td><td>Q</td></tr>
+<tr><td>Interagir / escolher bênção</td><td>E</td></tr><tr><td>Itens de combate</td><td>1 2 3 4</td></tr>
+<tr><td>Inventário</td><td>I / Tab</td></tr><tr><td>Diário</td><td>J</td></tr><tr><td>Pausa</td><td>Esc</td></tr></table>
+<ul><li>Derrote os bichos para ganhar experiência e subir de nível; a cada nível você escolhe um treino ou uma bênção.</li>
+<li>Colete ouro para comprar armas, roupas e patuás. Joias podem ser compradas opcionalmente por Pix.</li>
+<li>Entre com sua conta Google para salvar o progresso na nuvem e aparecer no ranking global.</li></ul></section>
+<section id="encantados"><h2>Os Encantados</h2>
+<p>Vinte lendas do folclore brasileiro oferecem bênçãos que mudam a forma de lutar. Cada uma tem dezenas de ataques e poderes.</p>
+<div class="grid">
+<article class="card"><img src="img/boitata.png" alt="Medalhão de Boitatá" width="96" height="96" loading="lazy"><h3>Boitatá</h3><p>Cobra de fogo que protege a mata. Bênçãos de chamas e queimadura.</p></article>
+<article class="card"><img src="img/boto.png" alt="Medalhão de Boto" width="96" height="96" loading="lazy"><h3>Boto</h3><p>O sedutor dos rios. Água, encanto e controle de multidões.</p></article>
+<article class="card"><img src="img/saci.png" alt="Medalhão de Saci" width="96" height="96" loading="lazy"><h3>Saci</h3><p>Redemoinhos e raios. Velocidade e dano em cadeia.</p></article>
+<article class="card"><img src="img/caipora.png" alt="Medalhão de Caipora" width="96" height="96" loading="lazy"><h3>Caipora</h3><p>Guardiã da caça. Espinhos, pedras e proteção da natureza.</p></article>
+<article class="card"><img src="img/mapinguari.png" alt="Medalhão de Mapinguari" width="96" height="96" loading="lazy"><h3>Mapinguari</h3><p>Gigante da floresta. Golpes pesados e abalos no chão.</p></article>
+<article class="card"><img src="img/curupira.png" alt="Medalhão de Curupira" width="96" height="96" loading="lazy"><h3>Curupira</h3><p>Pés virados e cipós. Raízes, sementes e rastros enganosos.</p></article>
+<article class="card"><img src="img/iara.png" alt="Medalhão de Iara" width="96" height="96" loading="lazy"><h3>Iara</h3><p>Mãe d'Água. Canto que encanta e correntezas que puxam.</p></article>
+<article class="card"><img src="img/matinta.png" alt="Medalhão de Matinta Perera" width="96" height="96" loading="lazy"><h3>Matinta Perera</h3><p>O assobio agourento. Maldições, confusão e medo.</p></article>
+<article class="card"><img src="img/anhanga.png" alt="Medalhão de Anhangá" width="96" height="96" loading="lazy"><h3>Anhangá</h3><p>Espírito do cervo branco. Marcas, galhadas e proteção da mata.</p></article>
+<article class="card"><img src="img/negrinho.png" alt="Medalhão de Negrinho do Pastoreio" width="96" height="96" loading="lazy"><h3>Negrinho do Pastoreio</h3><p>Luz, caminho e resgate. A vela que guia quem se perdeu.</p></article>
+<article class="card"><img src="img/fulozinha.png" alt="Medalhão de Comadre Fulozinha" width="96" height="96" loading="lazy"><h3>Comadre Fulozinha</h3><p>Tranças, cipós e trilhas falsas que prendem invasores.</p></article>
+<article class="card"><img src="img/uirapuru.png" alt="Medalhão de Uirapuru" width="96" height="96" loading="lazy"><h3>Uirapuru</h3><p>Ritmo e eco. Notas cortantes e canto que aumenta o crítico.</p></article>
+<article class="card"><img src="img/pisadeira.png" alt="Medalhão de Pisadeira" width="96" height="96" loading="lazy"><h3>Pisadeira</h3><p>Sono, peso e pesadelo. Pisões do telhado e cobertores de chumbo.</p></article>
+<article class="card"><img src="img/mae_ouro.png" alt="Medalhão de Mãe do Ouro" width="96" height="96" loading="lazy"><h3>Mãe do Ouro</h3><p>Minério, forja e ganância. Veios incandescentes e ouro extra.</p></article>
+<article class="card"><img src="img/boiuna.png" alt="Medalhão de Boiúna" width="96" height="96" loading="lazy"><h3>Boiúna</h3><p>A Cobra-Grande. Pressão da água, escamas e correnteza.</p></article>
+<article class="card"><img src="img/capelobo.png" alt="Medalhão de Capelobo" width="96" height="96" loading="lazy"><h3>Capelobo</h3><p>Caçada e perseguição. Garras que quebram a guarda.</p></article>
+<article class="card"><img src="img/caboclo.png" alt="Medalhão de Caboclo-d'Água" width="96" height="96" loading="lazy"><h3>Caboclo-d'Água</h3><p>Remadas e domínio das margens. Ondas e barrancos.</p></article>
+<article class="card"><img src="img/vitoria_regia.png" alt="Medalhão de Vitória-régia" width="96" height="96" loading="lazy"><h3>Vitória-régia</h3><p>Reflexo e cura. Pétalas, luar e proteção da lagoa.</p></article>
+<article class="card"><img src="img/loira.png" alt="Medalhão de Loira do Banheiro" width="96" height="96" loading="lazy"><h3>Loira do Banheiro</h3><p>Medo e espelhos quebrados. Cacos que giram e gritos.</p></article>
+<article class="card"><img src="img/corpo_seco.png" alt="Medalhão de Corpo-Seco" width="96" height="96" loading="lazy"><h3>Corpo-Seco</h3><p>Morte e rastejo. Mãos secas, ossos e vida roubada.</p></article>
+</div></section>
+<section id="personagens"><h2>Personagens</h2><div class="grid">
+<article class="card"><img src="img/vo_benta.png" alt="Vó Benta" width="96" height="96" loading="lazy"><h3>Vó Benta</h3><p>A benzedeira que cuida da casa e acende a lamparina a cada noite.</p></article>
+<article class="card"><img src="img/seu_ze.png" alt="Seu Zé Raizeiro" width="96" height="96" loading="lazy"><h3>Seu Zé Raizeiro</h3><p>Dono da venda: raízes, garrafadas e armas para a travessia.</p></article>
+<article class="card"><img src="img/mula.png" alt="Mula sem Cabeça" width="96" height="96" loading="lazy"><h3>Mula sem Cabeça</h3><p>Uma das criaturas mais temidas das noites da Mata Fechada.</p></article>
+<article class="card"><img src="img/cuca.png" alt="Cuca" width="96" height="96" loading="lazy"><h3>Cuca</h3><p>A bruxa do folclore, que ronda os pesadelos da floresta.</p></article>
+<article class="card"><img src="img/barao.png" alt="O Barão" width="96" height="96" loading="lazy"><h3>O Barão</h3><p>O senhor da Casa-Grande e o último inimigo da jornada.</p></article></div></section>
+<section id="ranking"><h2>Ranking e torneios</h2>
+<p>O ranking global mostra a noite alcançada e o nível dos jogadores que entraram com a conta Google. Torneios com prêmio, quando houver, serão anunciados com regulamento próprio antes de começar.</p></section>
+<section id="faq"><h2>Perguntas frequentes</h2>
+<details><summary>O jogo é gratuito?</summary><p>Sim. Há anúncios no jogo, e é possível comprar joias opcionais por Pix.</p></details>
+<details><summary>Preciso instalar algo?</summary><p>Não. O jogo roda no navegador do computador. Use um navegador atualizado, como Chrome, Edge ou Firefox.</p></details>
+<details><summary>Meu progresso fica salvo?</summary><p>Sim, no navegador. Entrando com a conta Google, ele também fica salvo na nuvem.</p></details>
+<details><summary>Como falo com o desenvolvedor?</summary><p>Por e-mail: <a href="mailto:eduardosolifritz@gmail.com">eduardosolifritz@gmail.com</a>.</p></details></section>
+</main>
+<footer>
+<p><a href="jogar.html">Jogar</a> · <a href="privacidade.html">Política de Privacidade</a> · <a href="termos.html">Termos de Uso</a></p>
+<p>Night Legends — versão de testes 0.x · nightlegends.com.br</p>
+<p>As lendas retratadas pertencem ao folclore brasileiro.</p>
+</footer></body></html>
